@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tennis Pairing & Court Allocator</title>
+    <script type='text/javascript' src='https://bq5xttzckghc6zds.canva-hosted-embed.com/lmQQgAe49Y1msSa8ESE72fGPcykFKk_FRWRaY0ocD2AOjlQzC2Au9c-hrmZb4i_w9TsAoeDR5PrQ8--3vfygsV1nB0P4JyhHdqEfuo76uFNxz-kNeRdsA1gkwSyhUcA28KkDSZ_WKGl33Q6MVFN9QTPxqPQ0FaSpx4kWrIFGtqc='></script><script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="max-w-5xl mx-auto p-8 bg-white shadow-lg rounded-lg mt-8">
+        <h1 class="text-3xl font-bold mb-6 text-center">🎾 Tennis Pairing & Court Allocator</h1>
+
+        <div class="grid md:grid-cols-3 gap-8">
+            <div class="space-y-6">
+                <div>
+                    <label class="font-semibold block mb-2">Players</label>
+                    <textarea 
+                        id="playersText" 
+                        class="w-full border p-3 rounded h-44 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                        placeholder="Alice&#10;Bob&#10;Charlie&#10;Diana&#10;Eve&#10;Frank"
+                    ></textarea>
+                </div>
+
+                <div>
+                    <label class="font-semibold block mb-2">Courts</label>
+                    <textarea 
+                        id="courtsText" 
+                        class="w-full border p-3 rounded h-32 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                        placeholder="Court 1&#10;Court 2&#10;Court 3"
+                    ></textarea>
+                </div>
+
+                <div class="flex flex-col gap-3">
+                    <div class="flex gap-3">
+                        <button 
+                            id="singlesBtn" 
+                            class="flex-1 px-4 py-2 rounded border hover:bg-gray-50 transition-colors"
+                            onclick="setMode('singles')"
+                        >
+                            Singles
+                        </button>
+                        <button 
+                            id="doublesBtn" 
+                            class="flex-1 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                            onclick="setMode('doubles')"
+                        >
+                            Doubles
+                        </button>
+                    </div>
+                    <button 
+                        onclick="generate()" 
+                        class="px-4 py-2 bg-green-600 text-white rounded w-full hover:bg-green-700 transition-colors"
+                    >
+                        Generate Pairings
+                    </button>
+                </div>
+            </div>
+
+            <div class="md:col-span-2 space-y-6">
+                <h2 class="text-2xl font-semibold mb-2">Results</h2>
+                <div id="results">
+                    <p class="text-gray-600">No schedule yet. Enter players and courts, then click Generate Pairings.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'doubles';
+
+        function parseList(text) {
+            return text.split(/\r?\n|,/).map(s => s.trim()).filter(Boolean);
+        }
+
+        function shuffle(array) {
+            const a = array.slice();
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        }
+
+        function pairPlayers(players, mode) {
+            const shuffled = shuffle(players);
+            if (mode === 'singles') {
+                return shuffled.reduce((acc, _, i) => {
+                    if (i % 2 === 0) {
+                        acc.push({ a: shuffled[i], b: shuffled[i + 1] || null });
+                    }
+                    return acc;
+                }, []);
+            }
+            
+            const teams = [];
+            for (let i = 0; i < shuffled.length; i += 2) {
+                teams.push([shuffled[i], shuffled[i + 1]].filter(Boolean));
+            }
+            
+            return teams.reduce((acc, _, i) => {
+                if (i % 2 === 0) {
+                    acc.push({ a: teams[i], b: teams[i + 1] || null });
+                }
+                return acc;
+            }, []);
+        }
+
+        function allocate(matches, courts) {
+            const allocation = courts.map((court, i) => ({ 
+                court, 
+                match: matches[i] || null 
+            }));
+            const waiting = matches.slice(courts.length);
+            return { allocation, waiting };
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            const singlesBtn = document.getElementById('singlesBtn');
+            const doublesBtn = document.getElementById('doublesBtn');
+            
+            if (mode === 'singles') {
+                singlesBtn.className = 'flex-1 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors';
+                doublesBtn.className = 'flex-1 px-4 py-2 rounded border hover:bg-gray-50 transition-colors';
+            } else {
+                singlesBtn.className = 'flex-1 px-4 py-2 rounded border hover:bg-gray-50 transition-colors';
+                doublesBtn.className = 'flex-1 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors';
+            }
+        }
+
+        function displayMatch(match) {
+            if (!match) return '(empty)';
+            
+            if (Array.isArray(match.a)) {
+                return match.b ? 
+                    `${match.a.join(' & ')} vs ${match.b.join(' & ')}` : 
+                    `${match.a.join(' & ')} (BYE)`;
+            }
+            
+            return match.b ? 
+                `${match.a} vs ${match.b}` : 
+                `${match.a} (BYE)`;
+        }
+
+        function generate() {
+            const playersText = document.getElementById('playersText').value;
+            const courtsText = document.getElementById('courtsText').value;
+            
+            const players = parseList(playersText);
+            const courts = parseList(courtsText);
+            
+            if (!players.length || !courts.length) {
+                alert('Please enter both players and courts');
+                return;
+            }
+            
+            const matches = pairPlayers(players, currentMode);
+            const { allocation, waiting } = allocate(matches, courts);
+            
+            displayResults(allocation, waiting);
+        }
+
+        function displayResults(allocation, waiting) {
+            const resultsDiv = document.getElementById('results');
+            
+            let html = '<div class="space-y-4">';
+            
+            // Court allocations
+            html += '<div><h3 class="text-lg font-semibold mb-3">Court Assignments</h3>';
+            html += '<ul class="space-y-2">';
+            
+            allocation.forEach(a => {
+                html += `<li class="border p-3 rounded bg-gray-50">
+                    <span class="font-semibold">${a.court}:</span> 
+                    <span class="ml-2">${displayMatch(a.match)}</span>
+                </li>`;
+            });
+            
+            html += '</ul></div>';
+            
+            // Waiting list
+            if (waiting.length > 0) {
+                html += '<div><h3 class="text-lg font-semibold mb-3">Waiting List</h3>';
+                html += '<ul class="space-y-2">';
+                
+                waiting.forEach((match, i) => {
+                    html += `<li class="border p-3 rounded bg-yellow-50">
+                        <span class="font-semibold">Match ${i + 1}:</span> 
+                        <span class="ml-2">${displayMatch(match)}</span>
+                    </li>`;
+                });
+                
+                html += '</ul></div>';
+            }
+            
+            html += '</div>';
+            resultsDiv.innerHTML = html;
+        }
+
+        // Initialize with some sample data
+        document.getElementById('playersText').value = 'Alice\nBob\nCharlie\nDiana\nEve\nFrank\nGrace\nHenry';
+        document.getElementById('courtsText').value = 'Court 1\nCourt 2\nCourt 3';
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98ae674fb10f60f9',t:'MTc1OTg1MDY0Ny4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
